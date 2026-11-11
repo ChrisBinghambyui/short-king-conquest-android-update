@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Short King Conquest 0.9</title>
+<style>
+  :root { --topH: 40px; --barB: 56px; --ink: #f1e6d0; --gold: #f2c94c; --edge: #8a5a2b; --solid: rgba(32,23,16,0.97); --glass: rgba(24,18,13,0.75); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #14110f; font-family: Georgia, serif; color: var(--ink); user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  #panes { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: flex; }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+  button { background: rgba(90,58,30,0.92); color: var(--ink); border: 1px solid var(--edge); padding: 6px 12px; min-height: 36px; font-family: inherit; font-size: 14px; cursor: pointer; border-radius: 8px; }
+  button:hover { background: #7a4f28; }
+  button.active { background: #c9852f; border-color: var(--gold); color: #1c1209; }
+  button.locked { opacity: 0.5; }
+  button.owned { background: #2f4a2a; border-color: #7bd66b; }
+  .hidden { display: none !important; }
+
+  /* Top strip: only the numbers you watch all the time */
+  #top { position: fixed; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(4px + env(safe-area-inset-top, 0px)) 8px 4px; background: linear-gradient(rgba(20,15,11,0.88), rgba(20,15,11,0.5)); font-size: 13px; }
+  #stats { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; }
+  #stats b, #sysStats b { color: var(--gold); }
+  #topBtns { display: flex; gap: 6px; flex: 0 0 auto; }
+  #topBtns button { min-height: 34px; padding: 4px 10px; }
+  #openBoard { border-color: #d9703a; }
+
+  /* Raid banner: exists only while a raid runs */
+  #raidHud { position: fixed; left: 50%; transform: translateX(-50%); top: calc(var(--topH) + 4px); z-index: 2; background: rgba(60,24,12,0.88); border: 1px solid #d9703a; border-radius: 14px; padding: 3px 12px; font-size: 13px; color: #ffcf9a; pointer-events: none; white-space: nowrap; max-width: 94vw; overflow: hidden; text-overflow: ellipsis; }
+  #raidHud:empty { display: none; }
+  #hint { position: fixed; left: 8px; top: calc(var(--topH) + 4px); max-width: min(62vw, 420px); z-index: 2; background: rgba(24,18,13,0.72); border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; padding: 3px 8px; font-size: 12px; color: #ffe9b0; pointer-events: none; }
+  #hint:empty { display: none; }
+
+  /* Bottom-left chips: one stack, so nothing can overlap */
+  #chips { position: fixed; left: 76px; bottom: calc(var(--barB) + 8px); z-index: 2; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: calc(100vw - 152px); pointer-events: none; font-size: 12px; text-shadow: 1px 1px 2px #000; }
+  #chips > div:empty { display: none; }
+  #hoverInfo, #status, #flags, #log div { background: var(--glass); border-radius: 8px; padding: 2px 8px; }
+  #log { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+  #hoverInfo { color: #ffe9b0; }
+  #status { color: #ff9a8a; }
+  #flags { color: #d9c9a8; }
+
+  /* Thumb cluster, bottom-right */
+  #touchBar, #touchLeft { position: fixed; bottom: calc(var(--barB) + 8px); z-index: 3; display: flex; flex-direction: column; gap: 6px; }
+  #touchBar { right: 8px; }
+  #touchLeft { left: 8px; }
+  #touchBar button, #touchLeft button { min-width: 60px; min-height: 44px; padding: 4px 6px; font-size: 13px; background: rgba(60,40,20,0.85); border-radius: 12px; }
+  #touchBar button.active, #touchLeft button.active { background: #c9852f; }
+
+  #toolbar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(20,15,11,0.5), rgba(20,15,11,0.92)); }
+  #toolbar button { flex: 1 0 auto; min-height: 42px; }
+  #menuPanel { position: fixed; bottom: calc(var(--barB) + 6px); background: var(--solid); border: 1px solid var(--gold); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 200px; max-width: min(340px, 94vw); max-height: calc(100vh - var(--barB) - var(--topH) - 20px); overflow-y: auto; z-index: 5; }
+  #menuPanel button { text-align: left; min-height: 38px; }
+  #menuPanel button.group { background: #3a2814; font-weight: bold; }
+  #menuPanel .groupBody { display: flex; flex-direction: column; gap: 4px; margin-left: 14px; }
+  #menuPanel button.tech { line-height: 1.3; }
+
+  #sysMenu { position: fixed; right: 8px; top: calc(var(--topH) + 4px); z-index: 5; width: 250px; max-width: 94vw; background: var(--solid); border: 1px solid var(--gold); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - var(--topH) - var(--barB) - 16px); overflow-y: auto; }
+  #sysStats { font-size: 12px; color: #d9c9a8; line-height: 1.5; border-bottom: 1px solid rgba(138,90,43,0.5); padding-bottom: 6px; }
+
+  #help { position: fixed; left: 8px; top: calc(var(--topH) + 8px); width: 400px; max-width: calc(100vw - 16px); max-height: calc(100vh - var(--topH) - var(--barB) - 24px); overflow-y: auto; z-index: 6; background: var(--solid); border: 1px solid var(--edge); border-radius: 10px; padding: 8px 14px; font-size: 13px; line-height: 1.45; }
+  .modal { max-width: 94vw; max-height: 90vh; overflow-y: auto; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 480px; background: var(--solid); border: 2px solid var(--gold); border-radius: 12px; padding: 14px 20px; z-index: 7; }
+  .modal h2 { margin: 0 0 8px 0; color: var(--gold); }
+  .modal .row { margin: 10px 0; }
+  #rivalTabs button { margin-right: 4px; margin-bottom: 4px; }
+  #dwarfPanel { width: 620px; max-height: 76vh; }
+  .dwarfCard { border: 1px solid var(--edge); border-radius: 8px; padding: 6px 8px; margin: 8px 0; background: rgba(20,14,10,0.6); }
+  .dwarfHead { font-weight: bold; color: #ffe9b0; margin-bottom: 4px; font-size: 13px; }
+  .skillRow { display: flex; align-items: center; gap: 8px; margin: 2px 0; font-size: 13px; }
+  .skillToggle { width: 52px; padding: 1px 4px; min-height: 30px; }
+  .skillLabel { width: 270px; }
+  .xpBar { flex: 1; height: 6px; background: #1c1612; display: block; }
+  .xpFill { display: block; height: 100%; background: #f2c94c; width: 0; }
+
+  @media (pointer: coarse) { #menuPanel button:not(.tech) > b { display: none; } }
+  @media (max-width: 520px) { .skillLabel { width: 150px; } .skillRow { font-size: 12px; } }
+</style>
+</head>
+<body>
+<div id="panes"><canvas id="viewSurface"></canvas><canvas id="viewUnder"></canvas></div>
+
+<div id="top">
+  <div id="stats">
+    <span>Credits <b id="credits">0</b></span>
+    <span>Stone <b id="stone">0</b></span>
+    <span>Income <b id="income">0</b>/m</span>
+    <span>Dwarves <b id="dwarves">0</b></span>
+  </div>
+  <div id="topBtns">
+    <button id="openBoard">Raid</button>
+    <button id="menuBtn">Menu</button>
+  </div>
+</div>
+
+<div id="sysMenu" class="hidden">
+  <div id="sysStats">
+    Tools <b id="picks"></b><br>
+    Regions <b id="regions">0</b> &middot; Claims <b id="claims">0</b> &middot; Record <b id="record"></b><br>
+    <span id="premium"></span>
+  </div>
+  <button id="dwarvesBtn" data-close="1">Dwarves (C)</button>
+  <button id="xrayBtn">X-ray</button>
+  <button id="saveBtn" data-close="1">Save</button>
+  <button id="helpBtn" data-close="1">Help</button>
+  <button id="newBtn" data-close="1">New game</button>
+</div>
+
+<div id="raidHud"></div>
+<div id="hint"></div>
+
+<div id="help" class="hidden">
+  <b>Short King Conquest 0.9</b><br>
+  <b>Touch:</b> one finger places or drags the selected tool. Tap <b>Pan</b> (bottom right) and one finger moves the camera instead. Two fingers always pan and pinch-zoom. Tap any tile to inspect it. <b>Rotate</b> and <b>Undo</b> appear when they apply. Portrait and landscape both work.<br><br>
+  <b>Two layers.</b> <b>Surface</b>: enemies, trees, boulders, defenses, and the rooms you carve into the mountain. <b>Underground</b>: rock, ore, belts, machines. One building per layer per tile. The View button cycles split / surface / underground; X-ray shows a faint view of the other layer.<br>
+  1. <b>Everything you place is a blueprint</b> that a dwarf with the Construction skill must build. <b>Trade Wagon</b> (Economy): first is free, near the Gate. Wagons collect cargo, haul it underground to the Gate and back, and refuse input while away. <b>Storage</b> (2x2, Economy) takes belt input instead and pools it until full; dwarves never fill it.<br>
+  2. <b>Dig</b> works on whichever view you use. Underground digging opens tunnels. Surface digging inside the mountain carves <b>rooms</b> (start at the Gate and go north). The <b>Lab</b> needs a 4x3 excavated room. <b>Beds</b>, desks and lanterns go in rooms or on open ground; doors need a room. Each dwarf wants a bed at a comfort level that rises with their best skill (tap a bed to see what it lacks). New dwarves need a free bed. Menu &gt; Dwarves shows skill levels and per-skill on/off switches, and hiring.<br>
+  3. <b>Ore nodes hold a limited stock</b> that slowly refills. Drain one and it stays shut until it is full again. The bar under each node shows its stock.<br>
+  4. <b>Clear</b> removes trees and boulders so towers can see. <b>Towers are built from bars and need ammo.</b> Belt bars and ore into a <b>Storage</b>; a dwarf with Craftsmanship on mans each tower during raids and restocks it from Storage. The <b>Belt Loader Rig</b> upgrade unlocks the <b>Ammo Tap</b>: put one on the underground layer directly beneath a tower and a belt feeds it with no dwarf, at 80% fire rate. Crossbows hit air and ground. Mortars splash ground targets over trees but cannot hit flyers.<br>
+  5. <b>Raid</b> (top right): buy-in sets enemy count and the base payout; difficulty multiplies enemy strength and payout. A win earns a map expansion: Actions &gt; Expand, then tap a glowing block.<br><br>
+  <b>Saving.</b> The game autosaves every 15 seconds and when you leave the app. Menu &gt; Save forces one; New game erases it. A raid in progress is saved too.<br><br>
+  <b>Keys (PC):</b> Space pause, F speed, V view, X x-ray, H pan mode, R rotate, Z undo, Esc close menus, WASD or right-drag pan, wheel zoom, number keys for common tools.
+  <div style="margin-top:8px"><button id="closeHelp">Close</button></div>
+</div>
+
+<div id="chips">
+  <div id="log"></div>
+  <div id="hoverInfo"></div>
+  <div id="status"></div>
+  <div id="flags"></div>
+</div>
+
+<div id="touchLeft">
+  <button id="tbPause">Pause</button>
+  <button id="tbSpeed">1x</button>
+</div>
+
+<div id="touchBar">
+  <button id="tbView">View</button>
+  <button id="tbPan">Pan</button>
+  <button id="tbRotate">Rotate E</button>
+  <button id="tbUndo">Undo</button>
+</div>
+
+<div id="menuPanel" class="panel hidden"></div>
+<div id="toolbar"></div>
+
+<div id="dwarfPanel" class="modal hidden">
+  <h2>Dwarves</h2>
+  <div class="row"><button id="hire">Hire dwarf</button></div>
+  <div>Toggle a skill OFF and that dwarf never takes those jobs. Levels raise speed; a comfortable bed adds more.</div>
+  <div id="dwarfBody"></div>
+  <div class="row"><button id="closeDwarves">Close</button></div>
+</div>
+
+<div id="raidBoard" class="modal hidden">
+  <h2>Raid Board</h2>
+  <div id="rivalTabs"></div>
+  <div id="scout"></div>
+  <div class="row">Buy-in: <button id="biMinus">-50</button> <b id="buyin"></b> <button id="biPlus">+50</button></div>
+  <div class="row">Difficulty: <button id="diffMinus">-</button> <b id="difficulty"></b> <button id="diffPlus">+</button></div>
+  <div class="row" id="payoutInfo"></div>
+  <div class="row"><button id="startRaid">Pay and start (no cash-out)</button> <button id="closeBoard">Close</button></div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
