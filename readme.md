@@ -6,14 +6,14 @@ I wanted to practice building a larger game catered towards mobile devices and l
 
 How to use the app:
 
-1. Build the Trade Wagon near the Gate.
+1. Build the Trade Wagon near the gate.
 2. Dig toward the ore and mine it to earn credits.
 3. Build drills, smelters, and belts to automate your income.
-4. Place towers outside the Gate, then press Raid to start a bet.
+4. Place towers outside the gate, then press Raid to start a bet.
 
 On a phone, one finger places the selected tool and two fingers pan and zoom. On PC, use the mouse, WASD to pan, and the scroll wheel to zoom.
 
-[Software Demo Video](http://youtube.link.goes.here)
+[Software Demo Video](https://youtu.be/b-dj7G6-FY0))
 
 # Development Environment
 
